@@ -1,6 +1,7 @@
 // GENEREAZA UN SEMNAL PWM BAZAT PE CE CITESTE DE PE UN POTENTIOMETRU;
 // De masurat frecventa cu osciloscop pentru verificare precisa!
-
+// Pentru driver-ul actual trebuie un PWM care pentru 0% => 1 ms
+// iar pentru 100% => 2ms
 void init_Adc(){
   ADMUX = 0b01000000;         //Setez tensiunea de referinta (AVcc)
   ADCSRA |= (1<<7);           //Enable la convertorul analogic digital
@@ -25,7 +26,8 @@ void init_pwm(){              //Timer 1
 }
 
 void set_pwm(float dutyRatio){
-  OCR1A = ICR1 * dutyRatio;
+  OCR1A = 63 * dutyRatio + 62;   // 62 tacti => 1ms ON in PWM => 0%
+                                 // 125 tacti => 2ms ON in PWM => 100%
 }
 
 void setup() {
