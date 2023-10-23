@@ -9,8 +9,9 @@
 % Se importeaza datele (viteza masurata in rad/s si factorul de umplere)
 % din fisierul Date_Identificare;
 
-%viteza = DateIdentificare(:,1)';
-%u = DateIdentificare(:,2)';
+viteza = DateIdentificare(:,1)';
+u = DateIdentificare(:,2)';
 t = 0:1:130;
 
-plot(t,u*6500,t,viteza);
+date_identificare = iddata(u',viteza',0.01);
+model = oe(date_identificare,[1 1 1]);
