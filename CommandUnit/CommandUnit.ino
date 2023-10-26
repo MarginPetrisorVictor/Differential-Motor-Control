@@ -26,7 +26,7 @@ void init_timer_1ms(){
 ISR(TIMER0_COMPA_vect){   // rot/s
   ms++;
 
-  if(s < 20 && ms % 10 == 9){
+  if(ms % 10 == 9){
     speed = counter*100*2*PI/8; // Viteza unghiulara in rad/s
     Serial.println(String(speed) + ", " + String(dutyRatio));
     counter = 0;
