@@ -7,7 +7,7 @@
 
 /* Actionare motor si verificare de viteza: */
 #define PI 3.14159265
-int ms = 0, s = 0;
+int ms = 0;
 float dutyRatio = 0;
 long counter = 0, speed = 0;
 char diskState = 0;
@@ -25,17 +25,14 @@ void init_timer_1ms(){
 
 ISR(TIMER0_COMPA_vect){   // rot/s
   ms++;
-
-  if(ms % 10 == 9){
-    speed = counter*100*2*PI/8; // Viteza unghiulara in rad/s
-    Serial.println(String(speed) + ", " + String(dutyRatio));
+  if(ms % 100 == 99){
+    speed = counter*10*2*PI/8; // Viteza unghiulara in rad/s
+    Serial.println(String(speed) + ", " + String(dutyRatio*5));
     counter = 0;
     speed = 0;
   }
-
-  if(ms > 999){
-    s++;
-    ms = 0;    
+  if(ms >= 999){
+    ms = 0;
   }
 }
 
@@ -78,6 +75,10 @@ void set_pwm(float dutyRatio){
                                  // 125 tacti => 2ms ON in PWM => 100%
 }
 
+void mapDutyRatio(float input){ 
+  dutyRatio = input/1023/5;
+}
+
 /* Setup */
 
 void setup() {
@@ -90,7 +91,7 @@ void setup() {
 
 void loop() {
   float input_value = read_Adc(0);
-  dutyRatio = input_value/1023;
+  mapDutyRatio(input_value);
   set_pwm(dutyRatio);
   count();
 }
