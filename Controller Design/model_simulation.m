@@ -9,8 +9,15 @@
 % Se importeaza datele (viteza masurata in rad/s si factorul de umplere)
 % din fisierul Date_Identificare;
 
-viteza = DateIdentificare100ms(:,1)';
-u = DateIdentificare100ms(:,2)';
-t = 0:length(u)-1;
+v_id = TreaptaIdentificare(:,1)';
+u_id = TreaptaIdentificare(:,2)';
+t_id = 0:0.1:75.3;
+v_v = TreaptaVerificare(:,1)';
+u_v = TreaptaVerificare(:,2)';
+t_v = 0:0.1:74.9;
+Ts = 0.1;
 
-plot(t,u*2000,t,viteza)
+plot(t_v,u_v*200,t_v,v_v);
+
+dateIdentificare = iddata(v_id',u_id',Ts);
+dateValidare = iddata(v_v',u_v',Ts);
