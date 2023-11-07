@@ -17,7 +17,11 @@ u_v = TreaptaVerificare(:,2)';
 t_v = 0:0.1:74.9;
 Ts = 0.1;
 
-plot(t_v,u_v*200,t_v,v_v);
+plot(t_id,u_id*200,t_id,v_id);
 
 dateIdentificare = iddata(v_id',u_id',Ts);
 dateValidare = iddata(v_v',u_v',Ts);
+
+time = seconds(t_id');
+dataInput = timetable(time,u_id');
+dataOut = timetable(time,v_id');
