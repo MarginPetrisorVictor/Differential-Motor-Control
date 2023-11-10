@@ -25,3 +25,10 @@ dateValidare = iddata(v_v',u_v',Ts);
 time = seconds(t_id');
 dataInput = timetable(time,u_id');
 dataOut = timetable(time,v_id');
+
+A = -1/0.8;
+B = 1;
+R = 0.1;
+Q = 10;
+K = lqr(A,B,Q,R);
+
