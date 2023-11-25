@@ -28,7 +28,7 @@ ISR(TIMER0_COMPA_vect){   // rot/s
   
   if(ms % 100 == 99){
     speed = 10 * counter/8;
-    Serial.println(String(speed) + "; " + String(dutyRatio));
+    Serial.println(String(speed) + "; " + String(speed/dutyRatio)+ "; " + String(dutyRatio));
     counter = 0; 
   }
 
@@ -119,7 +119,7 @@ void stepSim(){
     set_pwm(0);
     dutyRatio = 0;
   }*/
-  /*  Date Validare: */
+  /*  Date Validare: 
   if(s <= 10){
     set_pwm(0);
     dutyRatio = 0;
@@ -151,6 +151,19 @@ void stepSim(){
   if(s > 70){
     set_pwm(0);
     dutyRatio = 0;
+  }*/
+  if(s <= 10){
+    set_pwm(0);
+    dutyRatio = 0;
+  }
+  if(s > 10 && s <= 42){
+    if(s % 2 ==0)
+      dutyRatio = float((s - 10))/200 + 0.04;
+    set_pwm(dutyRatio);
+  }
+  if(s > 42){
+    dutyRatio = 0;
+    set_pwm(0);
   }
 }
 
