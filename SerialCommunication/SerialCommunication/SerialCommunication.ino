@@ -1,41 +1,33 @@
-// Serial communication:
-// Transmit date o data pe ms
+union ByteToFloat{
+  byte b[16];
+  float value;
+} u;
 
-int ms = 0;
-void init_Adc(){
-  ADMUX = 0b01000000;         //Setez tensiunea de referinta (AVcc)
-  ADCSRA |= (1<<7);           //Enable la convertorul analogic digital
+float value = 0;
+const int buffer_size = 16;
+byte buf[buffer_size];
+
+void setup(){
+  Serial.begin(115200);
 }
 
-int read_Adc(char channel){
-  ADMUX &= 0b01000000;        //Resetez canalul de convertire
-  ADMUX |= channel;           //Setez canalul de pe care citesc
-  ADCSRA |= (1<<6);           //Pornesc conversia
-  while(ADCSRA & (1<<6))      //Astept finalul conversiei
-  return (ADCL | (ADCH << 8));
+void loop(){
+  readFromMatlab();
+  delay(0.1);
+  writeToMatlab(value+5);
 }
 
-void init_timer0(){
-  TCCR0A = 0b10000000;     //Timer0 CTC
-  TCCR0B = 0b10000011;     //Prescaler de 64
-  TCNT0 = 0;
-  OCR0A = 250;             //1 ms
-  TIMSK0 |= (1<<1);
-  sei();
+void readFromMatlab(){
+  int readln = Serial.readBytesUntil("\r\n",buf,buffer_size);
+  for(int index = 0; index < buffer_size; index++){
+    u.b[index] = buf[index];
+  }
+  value = u.value;
 }
 
-ISR(TIMER0_COMPA_vect){
-  ms++;
-  float input_value = read_Adc(0);
-  float dutyRatio = input_value/1023;
-  Serial.println(String(dutyRatio)); //+ ", " + ms);  
-}
-
-void setup() {
-  Serial.begin(9600);
-  init_Adc();
-  init_timer0();
-}
-
-void loop() {
+void writeToMatlab(float number){
+  byte *b = (byte *) &number;
+  Serial.write(b, 4);
+  Serial.write(13);
+  Serial.write(10);
 }
