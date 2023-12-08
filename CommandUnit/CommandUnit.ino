@@ -8,9 +8,8 @@ union ByteToFloat{
 
 byte buffer[BUFFERSIZE];
 int ms = 0,s = 0;
-float dutyRatio = 0;
-float averageSpeed = 0;
-volatile long speed = 0, ref = 0;
+float dutyRatio = 0, averageSpeed = 0;
+volatile float speed = 0, ref = 0, commandThreshold = 0;
 volatile long counter = 0;
 volatile char diskState = 0;
 
@@ -30,6 +29,7 @@ ISR(TIMER0_COMPA_vect){
 
   readSpeed();
   setSpeed();
+
 
   if(ms >= 999){
     ms = 0;
@@ -114,29 +114,49 @@ void count(){
 //--------------CONTROLLER----------------
 
 void readSpeed(){
-  speed = 10*counter/8;
+  speed = 1.25*counter;
   averageSpeed += speed;
   counter = 0;
 }
 
+void setThreshold(float ref){
+  commandThreshold = ref/1785;
+}
+
 float command(float ref){
-  float error = 9.755*ref - 8.8278*averageSpeed;
+  float error = 10.2011*ref - 8.951102881551583*averageSpeed;
   float com = error/(0.06328*sq(averageSpeed)-29.11*averageSpeed+4417);
-  
-  if (com >= 0.3)
-    com = 0.3;
+
+  if(com < commandThreshold)
+    com = commandThreshold;
+
+  if (com >= 0.2)
+    com = 0.2;
+
+  if(com < 0)
+    com = 0;
 
   return com;
 }
 
 void setSpeed(){
   if(ms % 100 == 99){
-    float mappedRef = mapSpeedReference(ref);
-    Serial.println(averageSpeed);
+    if(s < 10)
+      ref = 0;
+    if(s > 10 && s < 20)
+      ref = 120;
+    if(s > 20)
+      ref = 0;
+    setThreshold(ref);
     float com = command(ref);
+    Serial.println(String(averageSpeed) + "; " + String(com));
     setPwm(com);
     averageSpeed = 0;
   }
+}
+
+void setReference(int reference){
+  ref = reference;
 }
 
 //----------------------------------------
@@ -151,6 +171,5 @@ void setup() {
 }
 
 void loop() {
-  ref = readAdc(0);
   count();
 }
