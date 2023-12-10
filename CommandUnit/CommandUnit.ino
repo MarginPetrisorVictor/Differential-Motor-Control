@@ -1,12 +1,5 @@
 #define PI 3.14159265
-#define BUFFERSIZE 16
 
-union ByteToFloat{
-  byte b[16];
-  float value;
-} u;
-
-byte buffer[BUFFERSIZE];
 int ms = 0,s = 0;
 float dutyRatio = 0, averageSpeed = 0;
 volatile float speed = 0, ref = 0, commandThreshold = 0;
@@ -29,7 +22,6 @@ ISR(TIMER0_COMPA_vect){
 
   readSpeed();
   setSpeed();
-
 
   if(ms >= 999){
     ms = 0;
@@ -73,28 +65,6 @@ void setPwm(float ratio){
 }
 
 //----------------------------------------
-//-------------SERIAL COM-----------------
-
-void readFromMatlab(){
-  int readln = Serial.readBytesUntil("\r\n",buffer,BUFFERSIZE);
-  for(int index = 0; index < BUFFERSIZE; index++){
-    u.b[index] = buffer[index];
-  }
-  dutyRatio = u.value;
-  Serial.flush();
-}
-
-void writeToMatlab(float number){
-  if(Serial.availableForWrite() >= 6){
-    byte *b = (byte *) &number;
-    Serial.write(b, 4);
-    Serial.write(13);
-    Serial.write(10);
-    Serial.flush();
-  }
-}
-
-//----------------------------------------
 //---------------UTILITIES----------------
 
 float mapSpeedReference(float input){ 
@@ -120,15 +90,31 @@ void readSpeed(){
 }
 
 void setThreshold(float ref){
-  commandThreshold = ref/1785;
+  commandThreshold = ref/(0.06328*sq(ref)-29.11*ref+4417);
+}
+
+float correctCommand(float testedCommand){
+  int integerCommand = (int) 2000 * testedCommand;
+  float floatCommand = 2000*testedCommand;
+  float returnedCommand = testedCommand;
+
+  if(floatCommand - integerCommand > 0.5)
+    returnedCommand = (float) (integerCommand + 1)/2000;
+
+  if(floatCommand - integerCommand < 0.5)
+    returnedCommand = (float) integerCommand/2000;
+
+  return returnedCommand;
 }
 
 float command(float ref){
-  float error = 10.2011*ref - 8.951102881551583*averageSpeed;
+  float error = 4.904*ref - 3.903882032022076*averageSpeed;
   float com = error/(0.06328*sq(averageSpeed)-29.11*averageSpeed+4417);
 
-  if(com < commandThreshold)
+  if(com < commandThreshold || error < ref + 50)
     com = commandThreshold;
+
+  com = correctCommand(com);
 
   if (com >= 0.2)
     com = 0.2;

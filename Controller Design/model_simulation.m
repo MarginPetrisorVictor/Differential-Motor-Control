@@ -29,5 +29,5 @@ dataOut = timetable(time,v_v');
 A = -1/0.8;
 B = 1;
 R = 0.1;
-Q = 10;
-K = lqr(A,B,Q,R,0.01);
+Q = 2.5;
+K = lqr(A,B,Q,R);
