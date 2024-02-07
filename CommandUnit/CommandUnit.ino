@@ -1,10 +1,10 @@
 #define PI 3.14159265
 
-int ms = 0,s = 0;
+int ms = 0, s = 0, encoderCounter = 0;
 float dutyRatio = 0, averageSpeed = 0;
 volatile float speed = 0, ref = 0, commandThreshold = 0;
 volatile long counter = 0;
-volatile char diskState = 0;
+volatile char diskState = 0, rightState, encoderState, leftState;
 
 //---------------1msTIMER-----------------
 
@@ -80,6 +80,7 @@ void count(){
     diskState = 0;
 }
 
+
 //----------------------------------------
 //--------------CONTROLLER----------------
 
@@ -135,7 +136,7 @@ void setSpeed(){
       ref = 0;
     setThreshold(ref);
     float com = command(ref);
-    Serial.println(String(averageSpeed) + "; " + String(com));
+    //Serial.println(String(averageSpeed) + "; " + String(com));
     setPwm(com);
     averageSpeed = 0;
   }
