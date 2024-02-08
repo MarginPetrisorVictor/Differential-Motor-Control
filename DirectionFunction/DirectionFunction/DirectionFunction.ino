@@ -77,7 +77,7 @@ void setup() {
 }
 
 void loop() {
-  int counter = -12;
+  int counter = 5;
   float speed = 10; // km/h
 
   mapDataFromQencoder(counter);

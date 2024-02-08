@@ -1,5 +1,20 @@
-#define PI 3.14159265
+#define PI 3.14159265359
+#define L 4
+#define T 2
+#define R 26.67
 
+struct direction {
+  char  orientation;
+  int   angle;
+};
+
+struct reference{
+  float leftMotorReference;
+  float rightMotorReference;
+};
+
+struct direction dir;
+struct reference refs;
 int ms = 0, s = 0, encoderCounter = 0;
 float dutyRatio = 0, averageSpeed = 0;
 volatile float speed = 0, ref = 0, commandThreshold = 0;
@@ -20,6 +35,11 @@ void init_timer_1ms(){
 ISR(TIMER0_COMPA_vect){
   ms++;
 
+  int qEncoderCounter = 5;
+  float refSpeed = 10; // km/h
+
+  mapDataFromQencoder(qEncoderCounter);
+  calculateRef(speed);
   readSpeed();
   setSpeed();
 
@@ -29,6 +49,56 @@ ISR(TIMER0_COMPA_vect){
   }
 }
 //----------------------------------------
+//---------REFERENCE CALCULATOR-----------
+float mapSpeedToAngularSpeed(float speed){
+  return speed * 1000/R/3.6;
+}
+
+void mapDataFromQencoder(int encoderCounter){
+  if(encoderCounter == 0){
+    dir.orientation = 0;
+    dir.angle = 0;
+  }
+  
+  if(encoderCounter > 0){
+    dir.orientation = 1;  // Merge la dreapta 
+    dir.angle = encoderCounter * 5;
+  }
+
+  if(encoderCounter < 0){
+    dir.orientation = -1; // Merge la stanga
+    dir.angle = -encoderCounter * 5;
+  }
+}
+
+float Deg2Rad(int angle){
+  return angle * PI / 180;
+}
+
+void calculateRef(float speed){
+  float radius = L/tan(Deg2Rad(dir.angle));
+  float innerAngle = atan(L/(radius - T/2));
+  float outerAngle = atan(L/(radius + T/2));
+  float mappedSpeed = mapSpeedToAngularSpeed(speed);
+
+  if(dir.orientation == 0){
+    refs.leftMotorReference = mappedSpeed;
+    refs.rightMotorReference = mappedSpeed;
+  }
+
+  if(dir.orientation == 1){
+    //Merge la dreapta
+    refs.rightMotorReference = mappedSpeed * cos(innerAngle);
+    refs.leftMotorReference = mappedSpeed * cos(outerAngle);
+  }
+
+  if(dir.orientation == -1){
+    //Merge la stanga
+    refs.rightMotorReference = mappedSpeed * cos(outerAngle);
+    refs.leftMotorReference = mappedSpeed * cos(innerAngle);
+  }
+}
+
 //-------------MANUAL INPUT---------------
 
 void initAdc(){
@@ -131,12 +201,12 @@ void setSpeed(){
     if(s < 10)
       ref = 0;
     if(s > 10 && s < 20)
-      ref = 120;
+      ref = refs.leftMotorReference;
     if(s > 20)
       ref = 0;
     setThreshold(ref);
     float com = command(ref);
-    //Serial.println(String(averageSpeed) + "; " + String(com));
+    Serial.println(String(averageSpeed) + "; " + String(com));
     setPwm(com);
     averageSpeed = 0;
   }
