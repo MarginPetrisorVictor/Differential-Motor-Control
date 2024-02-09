@@ -20,6 +20,30 @@ ISR(TIMER0_COMPA_vect){
   leftState = data & (1<<4);
 }
 
+/*
+switch(!qep->encoderState){
+    case 0:
+      if(qep->leftState && qep->rightState && qep->encoderState == 3)
+        qep->qEncoderCounter ++;
+      else
+        qep->qEncoderCounter --;
+      qep->encoderState = 0;
+      break;
+    case 1:
+      if(!qep->leftState && qep->rightState)
+        qep->encoderState = 1;
+      break;
+    case 2:
+      if(!(qep->leftState && qep->rightState))
+        qep->encoderState = 2;
+      break;
+    case 3:
+      if(qep->leftState && !qep->rightState)
+        qep->encoderState = 3;
+      break;
+  }
+*/
+
 void encoder(){
   //State 0: Left HIGH Right HIGH
   if(leftState && rightState && encoderState != 0){
