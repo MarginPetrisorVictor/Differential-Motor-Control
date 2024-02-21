@@ -12,8 +12,8 @@ struct UserInput{
 
 struct QuadratureEncoder{         
   char encoderState;              //Starea encoder-ului 
-  char leftState;                 //Starea senzorului din stanga
-  char rightState;                //Starea senzorului din dreapta
+  bool leftState;                 //Starea senzorului din stanga
+  bool rightState;                //Starea senzorului din dreapta
   int qEncoderCounter;            //Nr. de impulsuri citite (pentru mers la drepta ++ pentru mers la stanga --)
 };
 
@@ -39,20 +39,18 @@ struct Command{
 };
 
 struct SpeedEncoder{
-  uint8_t leftMotorCounter;      //Numarul de impulsuri citit pentru motorul din stanga (max 250[rot/s] => 2000[imp/s])
-  char leftDiskState = 0;         //Starea encoder-ului asignat motorului stang
-  uint8_t rightMotorCounter;     //Numarul de impulsuri citit pentru motorul din dreapta
-  char rightDiskState = 0;        //Starea encoder-ului asignat motorului drept
+  uint8_t leftMotorCounter;       //Numarul de impulsuri citit pentru motorul din stanga (max 250[rot/s] => 2000[imp/s])
+  char leftDiskState;             //Starea encoder-ului asignat motorului stang
+  uint8_t rightMotorCounter;      //Numarul de impulsuri citit pentru motorul din dreapta
+  char rightDiskState;            //Starea encoder-ului asignat motorului drept
 };
-
-struct UserInput input;
+                    
 struct Data data;
 struct References refs;
 struct SpeedEncoder speedEncoder;
 struct QuadratureEncoder quadratureEncoder;
-struct MeasuredSpeed measuredSpeed;
 
-void readInputData();
+void readInputData();                 /*** Trebuie adaugate in forward definiton toate functiile ***/
 void setReferences();
 void setCommand();
 void readWithHighSpeed();
@@ -66,7 +64,7 @@ Task setCommandTask(100, TASK_FOREVER, &setCommand);
 Task readSpeedTask(0.5, TASK_FOREVER, &readWithHighSpeed);
 Task readQuadratureEncoder(1, TASK_FOREVER, &readFastQEncoder);
 
-void setup() {
+void setup() {                        /*** Trebuie adaugata o functie de initializare pentru task-uri ***/
   Serial.begin(115200);
   _initPins();
   _initMotors();
@@ -110,8 +108,8 @@ void readFastQEncoder(){
 //Se mapeaza datele de la user
 //Se repeta o data la 200 ms;
 void readInputData(){
-  input = readAdcAndQEncoder(&quadratureEncoder); 
-  data = mapDataFromUser(&input);
+  struct UserInput input = readAdcAndQEncoder(&quadratureEncoder); 
+  data = mapDataFromUser(input);
 }
 
 //Prioritate: 2 (Mediu)
@@ -128,9 +126,9 @@ void setReferences(){
 //Se seteaza comanda pe motor (PWM la driver)
 //Trebuie executata o data la 100ms
 void setCommand(){
-  measuredSpeed = mapImpulsesToSpeed(&speedEncoder);
-  struct Command command = calculateCommands(&measuredSpeed, &refs); 
-  setToDrivers(&command);
+  struct MeasuredSpeed measuredSpeed = mapImpulsesToSpeed(&speedEncoder);
+  struct Command command = calculateCommands(measuredSpeed, &refs); 
+  setToDrivers(command);
 }
 
 //Prioritate: 0 (Cea mai mare)
@@ -155,22 +153,22 @@ struct UserInput readAdcAndQEncoder(struct QuadratureEncoder* qep){
   return newInputs;
 }
 
-struct Data mapDataFromUser(struct UserInput* uip){
+struct Data mapDataFromUser(struct UserInput input){
   struct Data mappedData;
   
-  mappedData.angularSpeed = uip->speed*1000/R/3.6;
+  mappedData.angularSpeed = input.speed*1000/R/3.6;
 
-  switch(uip->qCounter){
+  switch(input.qCounter){
     case 0:
       mappedData.orientation = 0;
       mappedData.angle = 0;
       break;
     default:
-      if(uip->qCounter > 0)
+      if(input.qCounter > 0)
         mappedData.orientation = 1;
       else
         mappedData.orientation = -1;
-      mappedData.angle = abs(uip->qCounter) * 5;
+      mappedData.angle = abs(input.qCounter) * 5;
       break;
   }
 
@@ -253,18 +251,18 @@ float regulator(uint8_t ref, uint8_t speed){
   return com;
 }
 
-struct Command calculateCommands(struct MeasuredSpeed* msp, struct References* rp){
+struct Command calculateCommands(struct MeasuredSpeed measuredSpeed, struct References* rp){
   struct Command com;
   
-  com.leftMotorCommand = regulator(rp->leftMotorRef, msp->leftMotorActualSpeed);
-  com.rightMotorCommand = regulator(rp->rightMotorRef, msp->rightMotorActualSpeed);
+  com.leftMotorCommand = regulator(rp->leftMotorRef, measuredSpeed.leftMotorActualSpeed);
+  com.rightMotorCommand = regulator(rp->rightMotorRef, measuredSpeed.rightMotorActualSpeed);
   
   return com;
 }
 
-void setToDrivers(struct Command* cp){
-  setLeftMotorCommand(cp->leftMotorCommand);
-  setRightMotorCommand(cp->rightMotorCommand);
+void setToDrivers(struct Command command){
+  setLeftMotorCommand(command.leftMotorCommand);
+  setRightMotorCommand(command.rightMotorCommand);
 }
 
 void interogateLeftEncoder(struct SpeedEncoder* sep){
@@ -292,7 +290,7 @@ void countImpulses(struct SpeedEncoder* sep){
   interogateRightEncoder(sep);
 }
 
-void Qencoder(struct QuadratureEncoder* qep){
+void Qencoder(struct QuadratureEncoder* qep){       /*** Trebuie modificat cu un switch case ***/
   char data = PIND;
   qep->rightState = data & (1<<2);
   qep->leftState = data & (1<<3);
@@ -342,7 +340,7 @@ uint8_t readAdc(char channel){
   ADMUX |= channel;           
   ADCSRA |= (1<<6);           
   while(ADCSRA & (1<<6))      
-  return (ADCL | (ADCH << 8))/102.3;
+  return (ADCL | (ADCH << 8))/102.3;    /*** Mai trb o functie de mapare ***/
 }
 
 void _initMotors(){                                       
