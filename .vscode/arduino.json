@@ -1,7 +1,0 @@
-{
-    "port": "COM3",
-    "board": "arduino:avr:uno",
-    "programmer": "arduinoasisp",
-    "sketch": "CommandUnit\\CommandUnit.ino",
-    "intelliSenseGen": "disable"
-}

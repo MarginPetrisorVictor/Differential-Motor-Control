@@ -2,7 +2,7 @@
 #define PI 3.14159265359
 #define L 4
 #define T 2
-#define R 26.67
+#define R 0.26
 #include <TaskScheduler.h>
 
 struct UserInput{
@@ -50,11 +50,35 @@ struct References refs;
 struct SpeedEncoder speedEncoder;
 struct QuadratureEncoder quadratureEncoder;
 
-void readInputData();                 /*** Trebuie adaugate in forward definiton toate functiile ***/
+void readFastQEncoder();
+void readInputData();                 
 void setReferences();
 void setCommand();
 void readWithHighSpeed();
-void readFastQEncoder();
+uint8_t mapInRegions(uint16_t value);
+int readQencoder(struct QuadratureEncoder* qep);
+struct UserInput readAdcAndQEncoder(struct QuadratureEncoder* qep);
+struct Data mapDataFromUser(struct UserInput input);
+float Deg2Rad(int angle);
+struct References calculateRefs(struct Data* dp);
+struct MeasuredSpeed mapImpulsesToSpeed(struct SpeedEncoder* sep);
+float threshold(float ref);
+float correctCommand(float testedCommand);
+float regulator(uint8_t ref, uint8_t speed);
+struct Command calculateCommands(struct MeasuredSpeed measuredSpeed, struct References* rp);
+void setToDrivers(struct Command command);
+void interogateLeftEncoder(struct SpeedEncoder* sep);
+void interogateRightEncoder(struct SpeedEncoder* sep);
+void countImpulses(struct SpeedEncoder* sep);
+void Qencoder(struct QuadratureEncoder* qep);
+uint16_t readAdc(char channel);
+void setLeftMotorCommand(float command);
+void setRightMotorCommand(float command);
+void _initPins();
+void _initMotors();
+void _initAdc();
+void _initQencoder();
+void _initTasks();
 
 Scheduler schedule;
 
@@ -64,31 +88,13 @@ Task setCommandTask(100, TASK_FOREVER, &setCommand);
 Task readSpeedTask(0.5, TASK_FOREVER, &readWithHighSpeed);
 Task readQuadratureEncoder(1, TASK_FOREVER, &readFastQEncoder);
 
-void setup() {                        /*** Trebuie adaugata o functie de initializare pentru task-uri ***/
+void setup() {                        
   Serial.begin(115200);
   _initPins();
   _initMotors();
   _initAdc();
   _initQencoder();
-  
-  readSpeedTask.setSchedulingOption(TASK_SCHEDULE);
-  setCommandTask.setSchedulingOption(TASK_SCHEDULE);
-  setRefsTask.setSchedulingOption(TASK_SCHEDULE);
-  readInputTask.setSchedulingOption(TASK_SCHEDULE);
-  readQuadratureEncoder.setSchedulingOption(TASK_SCHEDULE);
-
-  schedule.init();
-  schedule.addTask(readSpeedTask);
-  schedule.addTask(setCommandTask);
-  schedule.addTask(setRefsTask);
-  schedule.addTask(readInputTask);
-  schedule.addTask(readQuadratureEncoder);
-
-  readSpeedTask.enable();
-  setCommandTask.enable();
-  setRefsTask.enable();
-  readInputTask.enable();
-  readQuadratureEncoder.enable();
+  _initTasks();
 }
 
 void loop() {
@@ -129,6 +135,7 @@ void setCommand(){
   struct MeasuredSpeed measuredSpeed = mapImpulsesToSpeed(&speedEncoder);
   struct Command command = calculateCommands(measuredSpeed, &refs); 
   setToDrivers(command);
+  Serial.println(measuredSpeed.leftMotorActualSpeed);
 }
 
 //Prioritate: 0 (Cea mai mare)
@@ -139,6 +146,20 @@ void readWithHighSpeed(){
 }
 
 //-------------------------------UTILITIES----------------------------------------
+uint8_t mapInRegions(uint16_t value){
+  uint8_t speed = 0;
+  if(223 <= value && value < 423)
+    speed = 112;
+  if(423 <= value && value < 623)
+    speed = 132;
+  if(623 <= value && value < 823)
+    speed = 152;
+  if(823 <= value && value <= 1023)
+    speed = 172;
+
+  return speed;
+}
+
 int readQencoder(struct QuadratureEncoder* qep){
   int count = qep->qEncoderCounter;
   return count;
@@ -147,7 +168,7 @@ int readQencoder(struct QuadratureEncoder* qep){
 struct UserInput readAdcAndQEncoder(struct QuadratureEncoder* qep){
   struct UserInput newInputs;
 
-  newInputs.speed = readAdc(0);
+  newInputs.speed = mapInRegions(readAdc(0));
   newInputs.qCounter = readQencoder(qep);
 
   return newInputs;
@@ -156,7 +177,7 @@ struct UserInput readAdcAndQEncoder(struct QuadratureEncoder* qep){
 struct Data mapDataFromUser(struct UserInput input){
   struct Data mappedData;
   
-  mappedData.angularSpeed = input.speed*1000/R/3.6;
+  mappedData.angularSpeed = input.speed/R/3.6;
 
   switch(input.qCounter){
     case 0:
@@ -168,7 +189,7 @@ struct Data mapDataFromUser(struct UserInput input){
         mappedData.orientation = 1;
       else
         mappedData.orientation = -1;
-      mappedData.angle = abs(input.qCounter) * 5;
+      mappedData.angle = abs(input.qCounter);
       break;
   }
 
@@ -237,7 +258,7 @@ float regulator(uint8_t ref, uint8_t speed){
   float com = error/(0.06328*sq((float)speed)-29.11*(float)speed+4417);
   float thresholdCommand = threshold((float)ref);
   
-  if(com < thresholdCommand || error < ref + 50)
+  if(com < thresholdCommand)
     com = thresholdCommand;
   
   com = correctCommand(com);
@@ -245,7 +266,7 @@ float regulator(uint8_t ref, uint8_t speed){
   if(com >= 0.2)
     com = 0.2;
   
-  if(com < 0)
+  if(com < 0.06)
     com = 0;
 
   return com;
@@ -290,7 +311,7 @@ void countImpulses(struct SpeedEncoder* sep){
   interogateRightEncoder(sep);
 }
 
-void Qencoder(struct QuadratureEncoder* qep){       /*** Trebuie modificat cu un switch case ***/
+void Qencoder(struct QuadratureEncoder* qep){
   char data = PIND;
   qep->rightState = data & (1<<2);
   qep->leftState = data & (1<<3);
@@ -335,12 +356,12 @@ void _initAdc(){
   ADCSRA |= (1<<7);
 }
 
-uint8_t readAdc(char channel){
+uint16_t readAdc(char channel){
   ADMUX &= 0b01000000;        
   ADMUX |= channel;           
   ADCSRA |= (1<<6);           
   while(ADCSRA & (1<<6))      
-  return (ADCL | (ADCH << 8))/102.3;    /*** Mai trb o functie de mapare ***/
+  return (ADCL | (ADCH << 8));    
 }
 
 void _initMotors(){                                       
@@ -364,4 +385,25 @@ void setRightMotorCommand(float command){
     OCR1B = 2000 * command + 2000;
   else
     OCR1B = 2000;
+}
+
+void _initTasks(){
+  readSpeedTask.setSchedulingOption(TASK_SCHEDULE);
+  setCommandTask.setSchedulingOption(TASK_SCHEDULE);
+  setRefsTask.setSchedulingOption(TASK_SCHEDULE);
+  readInputTask.setSchedulingOption(TASK_SCHEDULE);
+  readQuadratureEncoder.setSchedulingOption(TASK_SCHEDULE);
+
+  schedule.init();
+  schedule.addTask(readSpeedTask);
+  schedule.addTask(setCommandTask);
+  schedule.addTask(setRefsTask);
+  schedule.addTask(readInputTask);
+  schedule.addTask(readQuadratureEncoder);
+
+  readSpeedTask.enable();
+  setCommandTask.enable();
+  setRefsTask.enable();
+  readInputTask.enable();
+  readQuadratureEncoder.enable();
 }
