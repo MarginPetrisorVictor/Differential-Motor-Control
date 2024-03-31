@@ -254,7 +254,7 @@ float correctCommand(float testedCommand){
 }
 
 float regulator(uint8_t ref, uint8_t speed){
-  float error = 4.904*(float)ref - 3.903882032022076*(float)speed;
+  float error = 2.8289*(float)ref - 1.828427124746*(float)speed;
   float com = error/(0.06328*sq((float)speed)-29.11*(float)speed+4417);
   float thresholdCommand = threshold((float)ref);
   

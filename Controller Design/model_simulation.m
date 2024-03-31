@@ -27,7 +27,7 @@ dataInput = timetable(time,u_v');
 dataOut = timetable(time,v_v');
 
 A = -1/0.8;
-B = 1;
-R = 0.1;
-Q = 2.5;
+B = 1/0.8;
+R = 1;
+Q = 7;
 K = lqr(A,B,Q,R);
