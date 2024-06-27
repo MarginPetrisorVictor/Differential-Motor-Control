@@ -83,10 +83,10 @@ void _initTasks();
 Scheduler schedule;
 
 Task readInputTask(200, TASK_FOREVER, &readInputData);
-Task setRefsTask(150, TASK_FOREVER, &setReferences);
+Task setRefsTask(100, TASK_FOREVER, &setReferences);
 Task setCommandTask(100, TASK_FOREVER, &setCommand);
 Task readSpeedTask(0.5, TASK_FOREVER, &readWithHighSpeed);
-Task readQuadratureEncoder(1, TASK_FOREVER, &readFastQEncoder);
+Task readQuadratureEncoderTask(1, TASK_FOREVER, &readFastQEncoder);
 
 void setup() {                        
   Serial.begin(115200);
@@ -123,6 +123,7 @@ void readInputData(){
 //Se executa o data la 150ms 
 void setReferences(){
   refs = calculateRefs(&data);
+  //Serial.println(String(refs.leftMotorRef)+" "+String(refs.rightMotorRef));
 }
 
 //Prioritate: 1 (Mare)
@@ -135,7 +136,7 @@ void setCommand(){
   struct MeasuredSpeed measuredSpeed = mapImpulsesToSpeed(&speedEncoder);
   struct Command command = calculateCommands(measuredSpeed, &refs); 
   setToDrivers(command);
-  Serial.println(measuredSpeed.leftMotorActualSpeed);
+  Serial.println(String(measuredSpeed.leftMotorActualSpeed)+" "+String(measuredSpeed.rightMotorActualSpeed)+" "+String(data.angle));
 }
 
 //Prioritate: 0 (Cea mai mare)
@@ -149,13 +150,13 @@ void readWithHighSpeed(){
 uint8_t mapInRegions(uint16_t value){
   uint8_t speed = 0;
   if(223 <= value && value < 423)
-    speed = 112;
-  if(423 <= value && value < 623)
     speed = 132;
-  if(623 <= value && value < 823)
+  if(423 <= value && value < 623)
     speed = 152;
-  if(823 <= value && value <= 1023)
+  if(623 <= value && value < 823)
     speed = 172;
+  if(823 <= value && value <= 1023)
+    speed = 192;
 
   return speed;
 }
@@ -205,19 +206,18 @@ struct References calculateRefs(struct Data* dp){
   float curveRadius = L/tan(Deg2Rad(dp->angle));
   float innerAngle = atan(L/(curveRadius - T/2));
   float outerAngle = atan(L/(curveRadius + T/2));
-  
   switch(dp->orientation){
     case 0:
       calculatedRefs.leftMotorRef = dp->angularSpeed;
       calculatedRefs.rightMotorRef = dp->angularSpeed;
       break;
     case 1:
-      calculatedRefs.leftMotorRef = dp->angularSpeed * cos(outerAngle);
-      calculatedRefs.rightMotorRef = dp->angularSpeed * cos(innerAngle);
+      calculatedRefs.leftMotorRef = (float)dp->angularSpeed * cos(outerAngle);
+      calculatedRefs.rightMotorRef = (float)dp->angularSpeed * cos(innerAngle);
       break;
     case -1:
-      calculatedRefs.leftMotorRef = dp->angularSpeed * cos(innerAngle);
-      calculatedRefs.rightMotorRef = dp->angularSpeed * cos(outerAngle);
+      calculatedRefs.leftMotorRef = (float)dp->angularSpeed * cos(innerAngle);
+      calculatedRefs.rightMotorRef = (float)dp->angularSpeed * cos(outerAngle);
       break;
   }
   
@@ -235,8 +235,12 @@ struct MeasuredSpeed mapImpulsesToSpeed(struct SpeedEncoder* sep){
   return newSpeeds;
 }
 
-float threshold(float ref){
+float thresholdLeft(float ref){
   return ref/(0.06328*sq(ref)-29.11*ref+4417);
+}
+
+float thresholdRight(float ref){
+  return ref/(0.06328*sq(ref)-29.11*ref+5200);
 }
 
 float correctCommand(float testedCommand){
@@ -253,10 +257,10 @@ float correctCommand(float testedCommand){
   return returnedCommand;
 }
 
-float regulator(uint8_t ref, uint8_t speed){
-  float error = 4.904*(float)ref - 3.903882032022076*(float)speed;
+float regulatorLeft(uint8_t ref, uint8_t speed){
+  float error = 2.5439* /*4.904*/(float)ref - 1.5442* /*3.903882032022076*/(float)speed;
   float com = error/(0.06328*sq((float)speed)-29.11*(float)speed+4417);
-  float thresholdCommand = threshold((float)ref);
+  float thresholdCommand = thresholdLeft((float)ref);
   
   if(com < thresholdCommand)
     com = thresholdCommand;
@@ -268,16 +272,39 @@ float regulator(uint8_t ref, uint8_t speed){
   
   if(com < 0.06)
     com = 0;
+    
+  return com;
+}
 
+float regulatorRight(uint8_t ref, uint8_t speed){
+  float error = 2.5439* /*4.904*/(float)ref - 1.5442* /*3.903882032022076*/(float)speed;
+  float com = error/(0.06328*sq((float)speed)-29.11*(float)speed+5200);
+  float thresholdCommand = thresholdRight((float)ref);
+  
+  if(com < thresholdCommand)
+    com = thresholdCommand;
+  
+  com = correctCommand(com);
+
+  if(com >= 0.2)
+    com = 0.2;
+  
+  if(com < 0.06)
+    com = 0;
+    
   return com;
 }
 
 struct Command calculateCommands(struct MeasuredSpeed measuredSpeed, struct References* rp){
   struct Command com;
   
-  com.leftMotorCommand = regulator(rp->leftMotorRef, measuredSpeed.leftMotorActualSpeed);
-  com.rightMotorCommand = regulator(rp->rightMotorRef, measuredSpeed.rightMotorActualSpeed);
-  
+  if(data.angle == 0){
+    com.leftMotorCommand = regulatorLeft(rp->leftMotorRef, measuredSpeed.leftMotorActualSpeed);
+    com.rightMotorCommand = regulatorRight(rp->leftMotorRef, measuredSpeed.rightMotorActualSpeed);
+  }else{
+  com.leftMotorCommand = regulatorLeft(rp->leftMotorRef, measuredSpeed.leftMotorActualSpeed);
+  com.rightMotorCommand = regulatorRight(rp->rightMotorRef, measuredSpeed.rightMotorActualSpeed);
+  }
   return com;
 }
 
@@ -392,18 +419,18 @@ void _initTasks(){
   setCommandTask.setSchedulingOption(TASK_SCHEDULE);
   setRefsTask.setSchedulingOption(TASK_SCHEDULE);
   readInputTask.setSchedulingOption(TASK_SCHEDULE);
-  readQuadratureEncoder.setSchedulingOption(TASK_SCHEDULE);
+  readQuadratureEncoderTask.setSchedulingOption(TASK_SCHEDULE);
 
   schedule.init();
   schedule.addTask(readSpeedTask);
   schedule.addTask(setCommandTask);
   schedule.addTask(setRefsTask);
   schedule.addTask(readInputTask);
-  schedule.addTask(readQuadratureEncoder);
+  schedule.addTask(readQuadratureEncoderTask);
 
   readSpeedTask.enable();
   setCommandTask.enable();
   setRefsTask.enable();
   readInputTask.enable();
-  readQuadratureEncoder.enable();
+  readQuadratureEncoderTask.enable();
 }
