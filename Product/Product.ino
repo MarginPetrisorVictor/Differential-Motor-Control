@@ -235,11 +235,11 @@ struct MeasuredSpeed mapImpulsesToSpeed(struct SpeedEncoder* sep){
   return newSpeeds;
 }
 
-float thresholdLeft(float ref){
+float thresholdRight(float ref){
   return ref/(0.06328*sq(ref)-29.11*ref+4417);
 }
 
-float thresholdRight(float ref){
+float thresholdLeft(float ref){
   return ref/(0.06328*sq(ref)-29.11*ref+5200);
 }
 
@@ -257,10 +257,10 @@ float correctCommand(float testedCommand){
   return returnedCommand;
 }
 
-float regulatorLeft(uint8_t ref, uint8_t speed){
+float regulatorRight(uint8_t ref, uint8_t speed){
   float error = 2.5439* /*4.904*/(float)ref - 1.5442* /*3.903882032022076*/(float)speed;
   float com = error/(0.06328*sq((float)speed)-29.11*(float)speed+4417);
-  float thresholdCommand = thresholdLeft((float)ref);
+  float thresholdCommand = thresholdRight((float)ref);
   
   if(com < thresholdCommand)
     com = thresholdCommand;
@@ -276,10 +276,10 @@ float regulatorLeft(uint8_t ref, uint8_t speed){
   return com;
 }
 
-float regulatorRight(uint8_t ref, uint8_t speed){
+float regulatorLeft(uint8_t ref, uint8_t speed){
   float error = 2.5439* /*4.904*/(float)ref - 1.5442* /*3.903882032022076*/(float)speed;
   float com = error/(0.06328*sq((float)speed)-29.11*(float)speed+5200);
-  float thresholdCommand = thresholdRight((float)ref);
+  float thresholdCommand = thresholdLeft((float)ref);
   
   if(com < thresholdCommand)
     com = thresholdCommand;
